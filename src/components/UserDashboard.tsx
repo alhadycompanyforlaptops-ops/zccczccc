@@ -200,13 +200,65 @@ export const UserDashboard = ({ userType, username }: UserDashboardProps) => {
     if (!base) return 'غير محدد';
     
     const result = new Date(base);
-    // Note: We don't have provider info in this context, so we'll use default 30 days
-    // In a real implementation, you might want to pass provider info or fetch it
     result.setUTCDate(result.getUTCDate() + 30);
     
     const d = result;
     if (!d) return 'غير محدد';
     return d.toLocaleDateString('ar-EG');
+  };
+
+  const formatRenewalWithProvider = (charging: string | null, renewal: string | null, provider: string | null) => {
+    const existing = parseDateAssume2025(renewal);
+    if (existing) return existing.toLocaleDateString('ar-EG');
+    
+    const base = parseDateAssume2025(charging);
+    if (!base) return 'غير محدد';
+    
+    const result = new Date(base);
+    // Etisalat: 28 days (renewal on day 29)
+    // Orange: 30 days (renewal on day 31)
+    // WE: 30 days (renewal on day 31)
+    if (provider === 'etisalat') {
+      result.setUTCDate(result.getUTCDate() + 28);
+    } else {
+      result.setUTCDate(result.getUTCDate() + 30);
+    }
+    
+    return result.toLocaleDateString('ar-EG');
+  };
+
+  const getRenewalAlert = (charging: string | null, renewal: string | null, provider: string | null) => {
+    const existing = parseDateAssume2025(renewal);
+    let renewalDate: Date;
+    
+    if (existing) {
+      renewalDate = existing;
+    } else {
+      const base = parseDateAssume2025(charging);
+      if (!base) return null;
+      
+      renewalDate = new Date(base);
+      if (provider === 'etisalat') {
+        renewalDate.setUTCDate(renewalDate.getUTCDate() + 28);
+      } else {
+        renewalDate.setUTCDate(renewalDate.getUTCDate() + 30);
+      }
+    }
+    
+    const today = new Date();
+    const timeDiff = renewalDate.getTime() - today.getTime();
+    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    
+    if (daysDiff <= 2 && daysDiff >= 0) {
+      return {
+        show: true,
+        daysLeft: daysDiff,
+        isToday: daysDiff === 0,
+        isTomorrow: daysDiff === 1
+      };
+    }
+    
+    return null;
   };
 
   if (loading) {
@@ -304,6 +356,22 @@ export const UserDashboard = ({ userType, username }: UserDashboardProps) => {
               <CardTitle className="flex items-center gap-2">
                 <Wifi className="h-5 w-5 text-blue-600" />
                 بيانات الخط
+                {(() => {
+                  const alert = getRenewalAlert(customer.charging_date, null, customer.provider);
+                  if (alert?.show) {
+                    return (
+                      <Badge 
+                        variant="destructive" 
+                        className="ml-2 animate-pulse bg-red-600 text-white border-red-500"
+                      >
+                        {alert.isToday ? 'التجديد اليوم!' : 
+                         alert.isTomorrow ? 'التجديد غداً!' : 
+                         `باقي ${alert.daysLeft} يوم للتجديد`}
+                      </Badge>
+                    );
+                  }
+                  return null;
+                })()}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -335,7 +403,7 @@ export const UserDashboard = ({ userType, username }: UserDashboardProps) => {
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-gray-300" />
                   <span className="font-medium">تاريخ التجديد:</span>
-                  <span className="text-orange-600 font-semibold">{formatRenewal(customer.charging_date, null)}</span>
+                  <span className="text-orange-600 font-semibold">{formatRenewalWithProvider(customer.charging_date, null, customer.provider)}</span>
                 </div>
               </div>
             </CardContent>
