@@ -60,12 +60,14 @@ export const UserDashboard = ({ userType, username }: UserDashboardProps) => {
         .from('suggested_names')
         .select('*')
         .eq('mobile_number', username)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
       
       if (data) {
         setSuggestedName(data.suggested_name);
+      } else {
+        setSuggestedName("");
       }
     } catch (error) {
       console.error('Error fetching suggested name:', error);
